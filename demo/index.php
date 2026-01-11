@@ -8,7 +8,7 @@ use DataLinx\PhpUpnQrGenerator\UPNQR;
 
 $buildDir = __DIR__ . '/build';
 if (! is_dir($buildDir)) {
-    mkdir($buildDir, 0777, true);
+    mkdir($buildDir, 0755, true);
 }
 
 $defaults = [
