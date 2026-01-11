@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.1.0] - 2026-01-11
+### Added
+- Validation helpers (`validate()`, `getPayload()`) and renderer reuse (`generateQrCodeWithRenderer()`).
+- Directory preflight checks and clearer PNG imagick requirement messaging.
+- Interactive demo (`demo/index.php`) with form inputs, live SVG/PNG previews, payload display, and client-side validation hints.
+- Expanded tests: directory writability error path, renderer reuse, DX helpers, payload length/charset/amount/date validations, and error wrapping.
+
+### Changed
+- Hardened validation (charset guard, strict dates, amount rounding/limits, payload length cap) with memoized serialization.
+- Exception clarity: user input errors remain `InvalidArgumentException`; unexpected writer/IO errors wrap into `QrGenerationException`.
+
 ## [2.0.0](https://github.com/DataLinx/php-upn-qr-generator/compare/v1.1.2...v2.0.0) (2025-06-16)
 
 
