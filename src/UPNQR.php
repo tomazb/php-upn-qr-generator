@@ -8,14 +8,21 @@ use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
+use DateTimeImmutable;
+use DateTimeZone;
 use Exception;
 use InvalidArgumentException;
 use RuntimeException;
+use DataLinx\PhpUpnQrGenerator\Exception\QrGenerationException;
 
 class UPNQR
 {
     public const LEADING_STRING = "UPNQR";
     public const DEFAULT_PURPOSE_CODE = "OTHR";
+    private const MAX_PAYLOAD_LENGTH = 411;
+    private const OUTPUT_ENCODING = 'ISO-8859-2';
+    private const DATE_INPUT_FORMAT = 'Y-m-d';
+    private const DATE_OUTPUT_FORMAT = 'd.m.Y';
 
     protected ?string $payerIban;
     protected ?bool $deposit;
@@ -35,6 +42,18 @@ class UPNQR
     protected ?string $recipientName;
     protected ?string $recipientStreetAddress;
     protected string $recipientCity;
+    private ?string $cachedSerializedPayload = null;
+    private bool $isDirty = true;
+
+    /**
+     * Named constructor that enforces required fields.
+     */
+    public static function create(string $recipientIban, string $recipientCity): self
+    {
+        return (new self())
+            ->setRecipientIban($recipientIban)
+            ->setRecipientCity($recipientCity);
+    }
 
     /**
      * Serialize UPN contents
@@ -43,6 +62,10 @@ class UPNQR
      */
     public function serializeContents(): string
     {
+        if (! $this->isDirty && $this->cachedSerializedPayload !== null) {
+            return $this->cachedSerializedPayload;
+        }
+
         // Check if all required parameters are set
         $this->checkRequiredParameters();
 
@@ -70,12 +93,23 @@ class UPNQR
                 $this->getRecipientCity(),
             ]) . $qrDelim;
 
-        // Checksum check. Max characters is 411.
-        $checksum = mb_strlen($qrContentStr);
+        $payloadLength = mb_strlen($qrContentStr, 'UTF-8');
+        if ($payloadLength > self::MAX_PAYLOAD_LENGTH) {
+            throw new InvalidArgumentException(
+                sprintf(
+                    "QR payload exceeds maximum %d characters (current: %d). Reduce field lengths.",
+                    self::MAX_PAYLOAD_LENGTH,
+                    $payloadLength
+                )
+            );
+        }
 
-        $qrContentStr .= sprintf('%03d', $checksum);
+        $qrContentStr .= sprintf('%03d', $payloadLength);
 
-        return $qrContentStr;
+        $this->cachedSerializedPayload = $qrContentStr;
+        $this->isDirty = false;
+
+        return $this->cachedSerializedPayload;
     }
 
     /**
@@ -88,33 +122,100 @@ class UPNQR
      */
     public function generateQrCode(string $filename, int $size = 400): void
     {
+        $this->assertWritableDirectory($filename);
+
+        switch (pathinfo($filename, PATHINFO_EXTENSION)) {
+            case 'svg':
+                $imageBackEnd = new SvgImageBackEnd();
+                break;
+
+            case 'png':
+                if (! extension_loaded('imagick')) {
+                    throw new RuntimeException("PNG generation requires the imagick PHP extension. Install php-imagick or use .svg/.eps.");
+                }
+                $imageBackEnd = new ImagickImageBackEnd();
+                break;
+
+            case 'eps':
+                $imageBackEnd = new EpsImageBackEnd();
+                break;
+
+            default:
+                throw new InvalidArgumentException("Please provide a valid path with a supported extension (.png, .svg or .eps).");
+        }
+
+        $renderer = new ImageRenderer(
+            new RendererStyle($size),
+            $imageBackEnd
+        );
+
+        $writer = $this->createWriter($renderer);
+
         try {
-            switch (pathinfo($filename, PATHINFO_EXTENSION)) {
-                case 'svg':
-                    $imageBackEnd = new SvgImageBackEnd();
-                    break;
-
-                case 'png':
-                    $imageBackEnd = new ImagickImageBackEnd();
-                    break;
-
-                case 'eps':
-                    $imageBackEnd = new EpsImageBackEnd();
-                    break;
-
-                default:
-                    throw new InvalidArgumentException("Please provide a valid path with a supported extension (.png, .svg or .eps).");
-            }
-
-            $renderer = new ImageRenderer(
-                new RendererStyle($size),
-                $imageBackEnd
-            );
-
-            $writer = new Writer($renderer);
-            $writer->writeFile($this->serializeContents(), $filename, "ISO-8859-2");
+            $writer->writeFile($this->serializeContents(), $filename, self::OUTPUT_ENCODING);
+        } catch (InvalidArgumentException $exception) {
+            // Bubble user/input errors unchanged
+            throw $exception;
         } catch (Exception $exception) {
-            throw new RuntimeException("Bacon QR code threw an exception: " . $exception->getMessage());
+            throw new QrGenerationException("QR code generation failed: " . $exception->getMessage(), 0, $exception);
+        }
+    }
+
+    /**
+     * Generate QR code using a pre-configured renderer (useful to reuse heavy backends).
+     */
+    public function generateQrCodeWithRenderer(ImageRenderer $renderer, string $filename): void
+    {
+        $this->assertWritableDirectory($filename);
+
+        $writer = $this->createWriter($renderer);
+
+        try {
+            $writer->writeFile($this->serializeContents(), $filename, self::OUTPUT_ENCODING);
+        } catch (InvalidArgumentException $exception) {
+            throw $exception;
+        } catch (Exception $exception) {
+            throw new QrGenerationException("QR code generation failed: " . $exception->getMessage(), 0, $exception);
+        }
+    }
+
+    /**
+     * Validate all fields without generating output.
+     */
+    public function validate(): self
+    {
+        $this->serializeContents();
+
+        return $this;
+    }
+
+    /**
+     * Get serialized QR payload without generating an image.
+     */
+    public function getPayload(): string
+    {
+        return $this->serializeContents();
+    }
+
+    /**
+     * Factory to create a QR writer. Overridable for testing.
+     */
+    protected function createWriter(ImageRenderer $renderer)
+    {
+        return new Writer($renderer);
+    }
+
+    /**
+     * Ensure the target directory exists and is writable.
+     */
+    private function assertWritableDirectory(string $filename): void
+    {
+        $dir = dirname($filename) ?: '.';
+        if (! is_dir($dir)) {
+            throw new InvalidArgumentException("Directory does not exist: {$dir}");
+        }
+        if (! is_writable($dir)) {
+            throw new InvalidArgumentException("Directory is not writable: {$dir}");
         }
     }
 
@@ -162,6 +263,7 @@ class UPNQR
         }
 
         $this->payerIban = $payerIban;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -183,6 +285,7 @@ class UPNQR
     public function setDeposit(?bool $deposit): self
     {
         $this->deposit = $deposit;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -204,6 +307,7 @@ class UPNQR
     public function setWithdraw(?bool $withdraw): self
     {
         $this->withdraw = $withdraw;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -225,9 +329,12 @@ class UPNQR
      */
     public function setPayerReference(?string $payerReference): self
     {
-        if ($payerReference) {
-            $payerReference = trim($payerReference);
-            if ($payerReference && ! preg_match('/^(SI|RF)\d{2}/', $payerReference)) {
+        $payerReference = $this->normalizeOptionalString($payerReference);
+
+        if ($payerReference !== null) {
+            $this->assertIso88592Charset($payerReference, 'Payer reference');
+
+            if (! preg_match('/^(SI|RF)\d{2}/', $payerReference)) {
                 throw new InvalidArgumentException("Payer reference must either be null or start with SI or RF and then 2 digits and other digits or characters.");
             }
             if (mb_strlen($payerReference) > 26) {
@@ -241,6 +348,7 @@ class UPNQR
         }
 
         $this->payerReference = $payerReference;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -262,14 +370,16 @@ class UPNQR
      */
     public function setPayerName(?string $payerName): self
     {
-        if ($payerName) {
-            $payerName = trim($payerName);
+        $payerName = $this->normalizeOptionalString($payerName);
+        if ($payerName !== null) {
+            $this->assertIso88592Charset($payerName, 'Payer name');
             if (mb_strlen($payerName) > 33) {
                 throw new InvalidArgumentException("Payer name must either be null or not have more than 33 characters.");
             }
         }
 
         $this->payerName = $payerName;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -291,14 +401,16 @@ class UPNQR
      */
     public function setPayerStreetAddress(?string $payerStreetAddress): self
     {
-        if ($payerStreetAddress) {
-            $payerStreetAddress = trim($payerStreetAddress);
+        $payerStreetAddress = $this->normalizeOptionalString($payerStreetAddress);
+        if ($payerStreetAddress !== null) {
+            $this->assertIso88592Charset($payerStreetAddress, 'Payer street address');
             if (mb_strlen($payerStreetAddress) > 33) {
                 throw new InvalidArgumentException("Payer street address must either be null or not have more than 33 characters.");
             }
         }
 
         $this->payerStreetAddress = $payerStreetAddress;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -320,14 +432,16 @@ class UPNQR
      */
     public function setPayerCity(?string $payerCity): self
     {
-        if ($payerCity) {
-            $payerCity = trim($payerCity);
+        $payerCity = $this->normalizeOptionalString($payerCity);
+        if ($payerCity !== null) {
+            $this->assertIso88592Charset($payerCity, 'Payer city');
             if (mb_strlen($payerCity) > 33) {
                 throw new InvalidArgumentException("Payer city must either be null or not have more than 33 characters.");
             }
         }
 
         $this->payerCity = $payerCity;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -358,11 +472,16 @@ class UPNQR
      */
     public function setAmount(?float $amount): self
     {
-        if ($amount !== null && ($amount <= 0 || $amount > 999999999)) {
-            throw new InvalidArgumentException("Amount must either be null or a value between 0 and 1,000,000,000");
+        if ($amount !== null) {
+            if ($amount <= 0 || $amount > 999999999.99) {
+                throw new InvalidArgumentException("Amount must either be null or a value between 0.01 and 999,999,999.99");
+            }
+
+            $amount = round($amount, 2);
         }
 
         $this->amount = $amount;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -384,17 +503,9 @@ class UPNQR
      */
     public function setPaymentDate(?string $paymentDate): self
     {
-        if ($paymentDate) {
-            $paymentDate = trim($paymentDate);
-            if ($paymentDate && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $paymentDate)) {
-                throw new InvalidArgumentException("Payment date must either be null or be in the YYYY-MM-DD format.");
-            }
-            if ($paymentDate && strtotime($paymentDate) === false) {
-                throw new InvalidArgumentException("The provided payment date is not a valid date.");
-            }
-        }
-
+        $paymentDate = $this->validateAndNormalizeDate($paymentDate, 'Payment date');
         $this->paymentDate = $paymentDate;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -416,6 +527,7 @@ class UPNQR
     public function setUrgent(?bool $urgent): self
     {
         $this->urgent = $urgent;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -437,14 +549,16 @@ class UPNQR
      */
     public function setPurposeCode(?string $purposeCode): self
     {
-        if ($purposeCode) {
-            $purposeCode = trim($purposeCode);
-            if ($purposeCode && ! preg_match('/^[A-Z]{4}$/', $purposeCode)) {
+        $purposeCode = $this->normalizeOptionalString($purposeCode);
+        if ($purposeCode !== null) {
+            $this->assertIso88592Charset($purposeCode, 'Purpose code');
+            if (! preg_match('/^[A-Z]{4}$/', $purposeCode)) {
                 throw new InvalidArgumentException("Purpose code must be null or have exactly four uppercase characters [A-Z].");
             }
         }
 
         $this->purposeCode = $purposeCode;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -466,12 +580,16 @@ class UPNQR
      */
     public function setPaymentPurpose(?string $paymentPurpose): self
     {
-        $paymentPurpose = trim($paymentPurpose);
-        if (mb_strlen($paymentPurpose) > 42) {
-            throw new InvalidArgumentException("Payment purpose must either be null or not have more than 42 characters.");
+        $paymentPurpose = $this->normalizeOptionalString($paymentPurpose);
+        if ($paymentPurpose !== null) {
+            $this->assertIso88592Charset($paymentPurpose, 'Payment purpose');
+            if (mb_strlen($paymentPurpose) > 42) {
+                throw new InvalidArgumentException("Payment purpose must either be null or not have more than 42 characters.");
+            }
         }
 
         $this->paymentPurpose = $paymentPurpose;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -493,17 +611,9 @@ class UPNQR
      */
     public function setPaymentDueDate(?string $paymentDueDate): self
     {
-        if ($paymentDueDate) {
-            $paymentDueDate = trim($paymentDueDate);
-            if ($paymentDueDate && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $paymentDueDate)) {
-                throw new InvalidArgumentException("Payment due date must either be null or be in the YYYY-MM-DD format.");
-            }
-            if ($paymentDueDate && ! strtotime($paymentDueDate)) {
-                throw new InvalidArgumentException("The provided payment due date is not a valid date.");
-            }
-        }
-
+        $paymentDueDate = $this->validateAndNormalizeDate($paymentDueDate, 'Payment due date');
         $this->paymentDueDate = $paymentDueDate;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -533,6 +643,7 @@ class UPNQR
         }
 
         $this->recipientIban = $recipientIban;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -554,9 +665,12 @@ class UPNQR
      */
     public function setRecipientReference(?string $recipientReference): self
     {
-        if ($recipientReference) {
-            $recipientReference = trim($recipientReference);
-            if ($recipientReference && ! preg_match('/^(SI|RF)\d{2}/', $recipientReference)) {
+        $recipientReference = $this->normalizeOptionalString($recipientReference);
+
+        if ($recipientReference !== null) {
+            $this->assertIso88592Charset($recipientReference, 'Recipient reference');
+
+            if (! preg_match('/^(SI|RF)\d{2}/', $recipientReference)) {
                 throw new InvalidArgumentException("Recipient reference must either be null or start with SI or RF and then 2 digits and other digits or characters.");
             }
             if (mb_strlen($recipientReference) > 26) {
@@ -568,6 +682,7 @@ class UPNQR
         }
 
         $this->recipientReference = $recipientReference;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -589,14 +704,16 @@ class UPNQR
      */
     public function setRecipientName(?string $recipientName): self
     {
-        if ($recipientName) {
-            $recipientName = trim($recipientName);
+        $recipientName = $this->normalizeOptionalString($recipientName);
+        if ($recipientName !== null) {
+            $this->assertIso88592Charset($recipientName, 'Recipient name');
             if (mb_strlen($recipientName) > 33) {
                 throw new InvalidArgumentException("Recipient name must either be null or not have more than 33 characters.");
             }
         }
 
         $this->recipientName = $recipientName;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -618,14 +735,16 @@ class UPNQR
      */
     public function setRecipientStreetAddress(?string $recipientStreetAddress): self
     {
-        if ($recipientStreetAddress) {
-            $recipientStreetAddress = trim($recipientStreetAddress);
+        $recipientStreetAddress = $this->normalizeOptionalString($recipientStreetAddress);
+        if ($recipientStreetAddress !== null) {
+            $this->assertIso88592Charset($recipientStreetAddress, 'Recipient street address');
             if (mb_strlen($recipientStreetAddress) > 33) {
                 throw new InvalidArgumentException("Recipient street address must either be null or not have more than 33 characters.");
             }
         }
 
         $this->recipientStreetAddress = $recipientStreetAddress;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -648,11 +767,16 @@ class UPNQR
     public function setRecipientCity(string $recipientCity): self
     {
         $recipientCity = trim($recipientCity);
+        $this->assertIso88592Charset($recipientCity, 'Recipient city');
+        if ($recipientCity === '') {
+            throw new InvalidArgumentException("Recipient city is required.");
+        }
         if (mb_strlen($recipientCity) > 33) {
             throw new InvalidArgumentException("Recipient city should not have more than 33 characters.");
         }
 
         $this->recipientCity = $recipientCity;
+        $this->isDirty = true;
 
         return $this;
     }
@@ -664,6 +788,65 @@ class UPNQR
      */
     public function formatDate(string $date): string
     {
-        return date('d.m.Y', strtotime($date));
+        $parsed = DateTimeImmutable::createFromFormat(self::DATE_INPUT_FORMAT, $date);
+
+        if ($parsed === false) {
+            throw new InvalidArgumentException("Unable to format date, invalid input: {$date}");
+        }
+
+        return $parsed->format(self::DATE_OUTPUT_FORMAT);
+    }
+
+    /**
+     * Normalize string input: trim, convert empty to null.
+     */
+    private function normalizeOptionalString(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
+    }
+
+    /**
+     * Validate ISO-8859-2 compatibility to avoid encoder surprises.
+     */
+    private function assertIso88592Charset(string $value, string $fieldName): void
+    {
+        $converted = @iconv('UTF-8', self::OUTPUT_ENCODING . '//IGNORE', $value);
+        $back = @iconv(self::OUTPUT_ENCODING, 'UTF-8', $converted);
+
+        if ($back !== $value) {
+            throw new InvalidArgumentException(
+                sprintf("%s contains characters not supported by %s encoding.", $fieldName, self::OUTPUT_ENCODING)
+            );
+        }
+    }
+
+    /**
+     * Validate, normalize and return date string or null.
+     */
+    private function validateAndNormalizeDate(?string $date, string $fieldName): ?string
+    {
+        if ($date === null) {
+            return null;
+        }
+
+        $date = trim($date);
+        if ($date === '') {
+            return null;
+        }
+
+        $parsed = DateTimeImmutable::createFromFormat(self::DATE_INPUT_FORMAT, $date);
+        $errors = DateTimeImmutable::getLastErrors();
+
+        if ($parsed === false || ($errors && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
+            throw new InvalidArgumentException("$fieldName must be in YYYY-MM-DD format and be a valid date.");
+        }
+
+        return $date;
     }
 }
