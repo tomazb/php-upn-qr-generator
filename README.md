@@ -14,7 +14,7 @@ This library can output a PNG, SVG or EPS image to a local file.
 The code is fully tested, including OCRing of the generated QR code.
 
 ## Requirements
-- PHP >= 7.4 (see versions below)
+- PHP >= 8.1 (see versions below)
 - mbstring and iconv PHP extensions
 - imagick PHP extension — **optional**; required only for PNG (raster) output. SVG/EPS do not require imagick.
 
