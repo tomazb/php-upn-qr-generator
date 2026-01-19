@@ -8,12 +8,11 @@ use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
+use DataLinx\PhpUpnQrGenerator\Exception\QrGenerationException;
 use DateTimeImmutable;
-use DateTimeZone;
 use Exception;
 use InvalidArgumentException;
 use RuntimeException;
-use DataLinx\PhpUpnQrGenerator\Exception\QrGenerationException;
 
 class UPNQR
 {
@@ -23,6 +22,98 @@ class UPNQR
     private const OUTPUT_ENCODING = 'ISO-8859-2';
     private const DATE_INPUT_FORMAT = 'Y-m-d';
     private const DATE_OUTPUT_FORMAT = 'd.m.Y';
+    private const DEFAULT_RECIPIENT_REFERENCE = 'SI99';
+    private const IBAN_LENGTHS = [
+        'AD' => 24,
+        'AE' => 23,
+        'AL' => 28,
+        'AT' => 20,
+        'AZ' => 28,
+        'BA' => 20,
+        'BE' => 16,
+        'BG' => 22,
+        'BH' => 22,
+        'BI' => 27,
+        'BR' => 29,
+        'BY' => 28,
+        'CH' => 21,
+        'CR' => 22,
+        'CY' => 28,
+        'CZ' => 24,
+        'DE' => 22,
+        'DJ' => 27,
+        'DK' => 18,
+        'DO' => 28,
+        'EE' => 20,
+        'EG' => 29,
+        'ES' => 24,
+        'FI' => 18,
+        'FK' => 18,
+        'FO' => 18,
+        'FR' => 27,
+        'GB' => 22,
+        'GE' => 22,
+        'GI' => 23,
+        'GL' => 18,
+        'GR' => 27,
+        'GT' => 28,
+        'HN' => 28,
+        'HR' => 21,
+        'HU' => 28,
+        'IE' => 22,
+        'IL' => 23,
+        'IQ' => 23,
+        'IS' => 26,
+        'IT' => 27,
+        'JO' => 30,
+        'KW' => 30,
+        'KZ' => 20,
+        'LB' => 28,
+        'LC' => 32,
+        'LI' => 21,
+        'LT' => 20,
+        'LU' => 20,
+        'LV' => 21,
+        'LY' => 25,
+        'MC' => 27,
+        'MD' => 24,
+        'ME' => 22,
+        'MK' => 19,
+        'MN' => 20,
+        'MR' => 27,
+        'MT' => 31,
+        'MU' => 30,
+        'NI' => 28,
+        'NL' => 18,
+        'NO' => 15,
+        'OM' => 23,
+        'PK' => 24,
+        'PL' => 28,
+        'PS' => 29,
+        'PT' => 25,
+        'QA' => 29,
+        'RO' => 24,
+        'RS' => 22,
+        'RU' => 33,
+        'SA' => 24,
+        'SC' => 31,
+        'SD' => 18,
+        'SE' => 24,
+        'SI' => 19,
+        'SK' => 24,
+        'SM' => 27,
+        'SO' => 23,
+        'ST' => 25,
+        'SV' => 28,
+        'TL' => 23,
+        'TN' => 24,
+        'TR' => 26,
+        'UA' => 29,
+        'VA' => 22,
+        'VG' => 24,
+        'XK' => 20,
+        'YE' => 30,
+    ];
 
     protected ?string $payerIban;
     protected ?bool $deposit;
@@ -87,17 +178,18 @@ class UPNQR
                 $this->getPaymentPurpose(),
                 isset($this->paymentDueDate) ? $this->formatDate($this->getPaymentDueDate()) : "",
                 $this->getRecipientIban(),
-                $this->getRecipientReference() ?: "SI99",
+                $this->getRecipientReference() ?: self::DEFAULT_RECIPIENT_REFERENCE,
                 $this->getRecipientName(),
                 $this->getRecipientStreetAddress(),
                 $this->getRecipientCity(),
             ]) . $qrDelim;
 
-        $payloadLength = mb_strlen($qrContentStr, 'UTF-8');
+        $encodedPayload = iconv('UTF-8', self::OUTPUT_ENCODING . '//IGNORE', $qrContentStr);
+        $payloadLength = strlen($encodedPayload);
         if ($payloadLength > self::MAX_PAYLOAD_LENGTH) {
             throw new InvalidArgumentException(
                 sprintf(
-                    "QR payload exceeds maximum %d characters (current: %d). Reduce field lengths.",
+                    "QR payload exceeds maximum %d bytes (current: %d). Reduce field lengths.",
                     self::MAX_PAYLOAD_LENGTH,
                     $payloadLength
                 )
@@ -200,7 +292,7 @@ class UPNQR
     /**
      * Factory to create a QR writer. Overridable for testing.
      */
-    protected function createWriter(ImageRenderer $renderer)
+    protected function createWriter(ImageRenderer $renderer): Writer
     {
         return new Writer($renderer);
     }
@@ -233,9 +325,18 @@ class UPNQR
 
         foreach ($params as $param) {
             if (! isset($this->{$param})) {
-                throw new InvalidArgumentException("$param is required.");
+                throw new InvalidArgumentException($this->formatRequiredMessage($param));
             }
         }
+    }
+
+    private function formatRequiredMessage(string $param): string
+    {
+        return match ($param) {
+            'recipientIban' => 'Recipient IBAN is required.',
+            'recipientCity' => 'Recipient city is required.',
+            default => sprintf('%s is required.', $param),
+        };
     }
 
     /**
@@ -247,7 +348,7 @@ class UPNQR
     }
 
     /**
-     * Payer IBAN account number written with 19 characters (example: SI56020170014356205)
+     * Payer IBAN account number (example: SI56020170014356205)
      * (sln. IBAN plačnika)
      * @param string|null $payerIban
      * @return $this
@@ -255,11 +356,11 @@ class UPNQR
      */
     public function setPayerIban(?string $payerIban): self
     {
-        if ($payerIban) {
-            $payerIban = trim(str_replace(' ', '', $payerIban));
-            if ($payerIban && ! preg_match('/^[a-z]{2}\d{17}$/i', $payerIban)) {
-                throw new InvalidArgumentException("Payer IBAN must either be null or have 19 characters with the country code prefix of two characters (alpha-2 ISO standard).");
-            }
+        $payerIban = $this->normalizeOptionalString($payerIban);
+
+        if ($payerIban !== null) {
+            $payerIban = strtoupper(str_replace(' ', '', $payerIban));
+            $this->validateIban($payerIban, 'Payer IBAN');
         }
 
         $this->payerIban = $payerIban;
@@ -342,7 +443,7 @@ class UPNQR
             }
 
             // Source: http://www.firmar.si/index.jsp?pg=nasveti-clanki/upn/referenca-si-in-rf-za-univerzalni-placilni-nalog-upn
-            if (0 === strpos($payerReference, "SI") && substr_count($payerReference, '-') > 2) {
+            if (str_starts_with($payerReference, 'SI') && substr_count($payerReference, '-') > 2) {
                 throw new InvalidArgumentException("Payer references that starts with SI should not have more than two dashes.");
             }
         }
@@ -473,8 +574,8 @@ class UPNQR
     public function setAmount(?float $amount): self
     {
         if ($amount !== null) {
-            if ($amount <= 0 || $amount > 999999999.99) {
-                throw new InvalidArgumentException("Amount must either be null or a value between 0.01 and 999,999,999.99");
+            if ($amount < 0.01 || $amount > 999999999.99) {
+                throw new InvalidArgumentException('Amount must either be null or a value between 0.01 and 999,999,999.99');
             }
 
             $amount = round($amount, 2);
@@ -627,7 +728,7 @@ class UPNQR
     }
 
     /**
-     * Recipient/payee IBAN account number written with 19 characters (example: SI56020170014356205)
+     * Recipient/payee IBAN account number (example: SI56020170014356205)
      * (sln. IBAN prejemnika)
      * @param string $recipientIban
      * @return $this
@@ -635,12 +736,13 @@ class UPNQR
      */
     public function setRecipientIban(string $recipientIban): self
     {
-        if ($recipientIban) {
-            $recipientIban = trim(str_replace(' ', '', $recipientIban));
-            if (! preg_match('/^[a-z]{2}\d{17}$/i', $recipientIban)) {
-                throw new InvalidArgumentException("Recipient IBAN must be 19 characters long with the country code prefix of two characters (alpha-2 ISO standard).");
-            }
+        $recipientIban = trim($recipientIban);
+        if ($recipientIban === '') {
+            throw new InvalidArgumentException('Recipient IBAN is required.');
         }
+
+        $recipientIban = strtoupper(str_replace(' ', '', $recipientIban));
+        $this->validateIban($recipientIban, 'Recipient IBAN');
 
         $this->recipientIban = $recipientIban;
         $this->isDirty = true;
@@ -676,7 +778,7 @@ class UPNQR
             if (mb_strlen($recipientReference) > 26) {
                 throw new InvalidArgumentException("Recipient reference should not have more than 26 characters.");
             }
-            if (0 === strpos($recipientReference, "SI") && substr_count($recipientReference, '-') > 2) {
+            if (str_starts_with($recipientReference, 'SI') && substr_count($recipientReference, '-') > 2) {
                 throw new InvalidArgumentException("Recipient references that starts with SI should not have more than two dashes.");
             }
         }
@@ -848,5 +950,39 @@ class UPNQR
         }
 
         return $date;
+    }
+
+    private function validateIban(string $iban, string $fieldName): void
+    {
+        $normalized = strtoupper(str_replace(' ', '', $iban));
+        if (! preg_match('/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/', $normalized)) {
+            throw new InvalidArgumentException("{$fieldName} format is invalid.");
+        }
+
+        $countryCode = substr($normalized, 0, 2);
+        $expectedLength = self::IBAN_LENGTHS[$countryCode] ?? null;
+        if ($expectedLength === null) {
+            throw new InvalidArgumentException("{$fieldName} country code is not supported.");
+        }
+        if (strlen($normalized) !== $expectedLength) {
+            throw new InvalidArgumentException("{$fieldName} length is invalid.");
+        }
+
+        $rearranged = substr($normalized, 4) . substr($normalized, 0, 4);
+        $remainder = 0;
+        foreach (str_split($rearranged) as $char) {
+            $segment = $char;
+            if (ctype_alpha($char)) {
+                $segment = (string) (ord($char) - 55);
+            }
+
+            foreach (str_split($segment) as $digit) {
+                $remainder = ($remainder * 10 + (int) $digit) % 97;
+            }
+        }
+
+        if ($remainder !== 1) {
+            throw new InvalidArgumentException("{$fieldName} checksum is invalid.");
+        }
     }
 }

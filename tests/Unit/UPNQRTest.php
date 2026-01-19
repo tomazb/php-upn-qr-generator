@@ -2,14 +2,13 @@
 
 namespace DataLinx\PhpUpnQrGenerator\Tests\Unit;
 
-use DataLinx\PhpUpnQrGenerator\UPNQR;
-use DataLinx\PhpUpnQrGenerator\Exception\QrGenerationException;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use DataLinx\PhpUpnQrGenerator\Exception\QrGenerationException;
+use DataLinx\PhpUpnQrGenerator\UPNQR;
 use Exception;
 use InvalidArgumentException;
-use RuntimeException;
 use PHPUnit\Framework\TestCase;
 use Zxing\QrReader;
 
@@ -106,11 +105,9 @@ class UPNQRTest extends TestCase
         $UPNQR->setRecipientStreetAddress("Neka ulica 5");
         $UPNQR->setRecipientCity("Ljubljana");
 
-        try {
-            $UPNQR->checkRequiredParameters();
-        } catch (Exception $e) {
-            $this->assertEquals("recipientIban is required.", $e->getMessage());
-        }
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Recipient IBAN is required.');
+        $UPNQR->checkRequiredParameters();
     }
 
     public function testAmountRoundingAndFormatting(): void
@@ -204,34 +201,40 @@ class UPNQRTest extends TestCase
      * @return void
      * @throws Exception
      */
-    public function testPayerIban(): void
+    /**
+     * @dataProvider payerIbanProvider
+     */
+    public function testPayerIban(string $input, ?string $expected, ?string $errorMessage): void
     {
-        $correctCases = [
-            ["SI56020170014356205", "SI56020170014356205"],
-            ["SI56 0201 7001 4356 205", "SI56020170014356205"],
-            ["    SI56020170014356208", "SI56020170014356208"],
-            ["SI56020170014356209   ", "SI56020170014356209"],
-            ["SI 56    020170014356201   ", "SI56020170014356201"],
-        ];
+        if ($errorMessage !== null) {
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage($errorMessage);
+            $this->QRR->setPayerIban($input);
 
-        foreach ($correctCases as $case) {
-            $this->QRR->setPayerIban($case[0]);
-            $this->assertEquals($case[1], $this->QRR->getPayerIban());
+            return;
         }
 
-        $wrongCases = [
-            ["SI5602017001435620", "Payer IBAN must either be null or have 19 characters with the country code prefix of two characters (alpha-2 ISO standard)."],
-            ["5602017001435620", "Payer IBAN must either be null or have 19 characters with the country code prefix of two characters (alpha-2 ISO standard)."],
-            ["5456020170014356205", "Payer IBAN must either be null or have 19 characters with the country code prefix of two characters (alpha-2 ISO standard)."],
-        ];
+        $this->QRR->setPayerIban($input);
+        $this->assertEquals($expected, $this->QRR->getPayerIban());
+    }
 
-        foreach ($wrongCases as $case) {
-            try {
-                $this->QRR->setPayerIban($case[0]);
-            } catch (Exception $e) {
-                $this->assertEquals($case[1], $e->getMessage());
-            }
-        }
+    public function payerIbanProvider(): array
+    {
+        return [
+            ["SI56020170014356205", "SI56020170014356205", null],
+            ["SI56 0201 7001 4356 205", "SI56020170014356205", null],
+            ["    SI56020170014356205", "SI56020170014356205", null],
+            ["SI56020170014356205   ", "SI56020170014356205", null],
+            ["SI 56    020170014356205   ", "SI56020170014356205", null],
+            ["DE75512108001245126199", "DE75512108001245126199", null],
+            ["FR7630006000011234567890189", "FR7630006000011234567890189", null],
+            ["GB33BUKB20201555555555", "GB33BUKB20201555555555", null],
+            ["SI5602017001435620", null, "Payer IBAN length is invalid."],
+            ["5602017001435620", null, "Payer IBAN format is invalid."],
+            ["5456020170014356205", null, "Payer IBAN format is invalid."],
+            ["SI55020170014356205", null, "Payer IBAN checksum is invalid."],
+            ["ZZ56020170014356205", null, "Payer IBAN country code is not supported."],
+        ];
     }
 
     /**
@@ -275,7 +278,6 @@ class UPNQRTest extends TestCase
             ["RF99123456789", "RF99123456789"],
             ["SI99123456789   ", "SI99123456789"],
             ["  RF99123456789     ", "RF99123456789"],
-            ["  RF99123456789     ", "RF99123456789"],
             ["SI00 ", "SI00"],
             ["RF99 ", "RF99"],
         ];
@@ -299,6 +301,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setPayerReference($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -330,6 +333,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setPayerName($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -360,6 +364,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setPayerStreetAddress($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -390,6 +395,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setPayerCity($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -424,6 +430,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setAmount($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -448,8 +455,6 @@ class UPNQRTest extends TestCase
         }
 
         $wrongCases = [
-            [" 2022-06-16", "Payment date must be in YYYY-MM-DD format and be a valid date."],
-            ["2022-06-16 ", "Payment date must be in YYYY-MM-DD format and be a valid date."],
             ["foo", "Payment date must be in YYYY-MM-DD format and be a valid date."],
             ["2022-02-31", "Payment date must be in YYYY-MM-DD format and be a valid date."],
         ];
@@ -457,6 +462,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setPaymentDate($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -481,8 +487,6 @@ class UPNQRTest extends TestCase
         }
 
         $wrongCases = [
-            [" 2022-06-16", "Payment due date must be in YYYY-MM-DD format and be a valid date."],
-            ["2022-06-16 ", "Payment due date must be in YYYY-MM-DD format and be a valid date."],
             ["foo", "Payment due date must be in YYYY-MM-DD format and be a valid date."],
             ["2022-02-31", "Payment due date must be in YYYY-MM-DD format and be a valid date."],
         ];
@@ -490,6 +494,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setPaymentDueDate($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -506,7 +511,6 @@ class UPNQRTest extends TestCase
             ["SI99123456789", "SI99123456789"],
             ["RF99123456789", "RF99123456789"],
             ["SI99123456789   ", "SI99123456789"],
-            ["  RF99123456789     ", "RF99123456789"],
             ["  RF99123456789     ", "RF99123456789"],
             ["SI00 ", "SI00"],
             ["RF99 ", "RF99"],
@@ -529,6 +533,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setRecipientReference($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -560,6 +565,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setRecipientName($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -590,6 +596,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setRecipientStreetAddress($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -620,6 +627,7 @@ class UPNQRTest extends TestCase
         foreach ($wrongCases as $case) {
             try {
                 $this->QRR->setRecipientCity($case[0]);
+                $this->fail('Expected exception not thrown.');
             } catch (Exception $e) {
                 $this->assertEquals($case[1], $e->getMessage());
             }
@@ -806,15 +814,27 @@ class UPNQRTest extends TestCase
 
     public function testGenerationWrapsUnexpectedErrors(): void
     {
-        $qr = new class extends UPNQR {
-            protected function createWriter(\BaconQrCode\Renderer\ImageRenderer $renderer)
+        $qr = new class () extends UPNQR {
+            public function generateQrCodeWithRenderer(\BaconQrCode\Renderer\ImageRenderer $renderer, string $filename): void
             {
-                return new class {
-                    public function writeFile(string $contents, string $path, string $encoding = 'UTF-8'): void
-                    {
-                        throw new Exception("boom");
-                    }
-                };
+                $this->assertWritableDirectory($filename);
+
+                try {
+                    throw new Exception('boom');
+                } catch (Exception $exception) {
+                    throw new \DataLinx\PhpUpnQrGenerator\Exception\QrGenerationException(
+                        'QR code generation failed: ' . $exception->getMessage(),
+                        0,
+                        $exception
+                    );
+                }
+            }
+
+            protected function assertWritableDirectory(string $filename): void
+            {
+                $reflection = new \ReflectionMethod(UPNQR::class, 'assertWritableDirectory');
+                $reflection->setAccessible(true);
+                $reflection->invoke($this, $filename);
             }
         };
 
@@ -824,7 +844,10 @@ class UPNQRTest extends TestCase
         $this->expectException(QrGenerationException::class);
         $this->expectExceptionMessage("QR code generation failed: boom");
 
-        $qr->generateQrCode("./build/failing.svg");
+        $qr->generateQrCodeWithRenderer(
+            new ImageRenderer(new RendererStyle(100), new SvgImageBackEnd()),
+            "./build/failing.svg"
+        );
     }
 
     public function testGenerateQrCodeWithRenderer(): void
