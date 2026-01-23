@@ -248,10 +248,11 @@ class UPNQR
 
         try {
             $writer->writeFile($this->serializeContents(), $filename, self::OUTPUT_ENCODING);
-        } catch (InvalidArgumentException $exception) {
-            // Bubble user/input errors unchanged
-            throw $exception;
         } catch (Exception $exception) {
+            if ($exception instanceof InvalidArgumentException) {
+                // Bubble user/input errors unchanged
+                throw $exception;
+            }
             throw new QrGenerationException("QR code generation failed: " . $exception->getMessage(), 0, $exception);
         }
     }
@@ -267,9 +268,10 @@ class UPNQR
 
         try {
             $writer->writeFile($this->serializeContents(), $filename, self::OUTPUT_ENCODING);
-        } catch (InvalidArgumentException $exception) {
-            throw $exception;
         } catch (Exception $exception) {
+            if ($exception instanceof InvalidArgumentException) {
+                throw $exception;
+            }
             throw new QrGenerationException("QR code generation failed: " . $exception->getMessage(), 0, $exception);
         }
     }
@@ -333,7 +335,7 @@ class UPNQR
         ];
 
         foreach ($params as $param) {
-            if (! isset($this->{$param})) {
+            if (! isset($this->{$param}) || $this->{$param} === '') {
                 throw new InvalidArgumentException($this->formatRequiredMessage($param));
             }
         }
@@ -897,7 +899,7 @@ class UPNQR
      * @param string $date
      * @return string
      */
-    public function formatDate(string $date): string
+    private function formatDate(string $date): string
     {
         $parsed = DateTimeImmutable::createFromFormat(self::DATE_INPUT_FORMAT, $date);
 
