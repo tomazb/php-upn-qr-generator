@@ -115,6 +115,7 @@ function embedSvg(?string $path): ?string
 <div class="card">
     <h1>UPN QR Demo</h1>
     <p class="note">Enostaven prikaz generiranja UPN QR kode (SVG; PNG, če je na voljo Imagick).</p>
+    <p class="note">Demo ni namenjen produkcijski rabi; ne vključuje CSRF zaščite ali sanitizacije podatkov.</p>
 
     <?php if ($error): ?>
         <div class="error"><?= h($error); ?></div>
