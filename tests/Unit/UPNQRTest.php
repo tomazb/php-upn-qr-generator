@@ -203,11 +203,11 @@ class UPNQRTest extends TestCase
         $this->assertSame($explodedText[6], $this->QR->getPayerStreetAddress());
         $this->assertSame($explodedText[7], $this->QR->getPayerCity());
         $this->assertSame($explodedText[8], $this->QR->getFormattedAmount());
-        $this->assertSame($explodedText[9], $this->QR->formatDate($this->QR->getPaymentDate()));
+        $this->assertSame($explodedText[9], $this->formatDateForTest($this->QR, $this->QR->getPaymentDate()));
         $this->assertSame($explodedText[10], $this->QR->getUrgent() ? 'X' : '');
         $this->assertSame($explodedText[11], $this->QR->getPurposeCode() ? strtoupper($this->QR->getPurposeCode()) : UPNQR::DEFAULT_PURPOSE_CODE);
         $this->assertSame($explodedText[12], $this->QR->getPaymentPurpose());
-        $this->assertSame($explodedText[13], $this->QR->formatDate($this->QR->getPaymentDueDate()));
+        $this->assertSame($explodedText[13], $this->formatDateForTest($this->QR, $this->QR->getPaymentDueDate()));
         $this->assertSame($explodedText[14], $this->QR->getRecipientIban());
         $this->assertSame($explodedText[15], $this->QR->getRecipientReference());
         $this->assertSame($explodedText[16], $this->QR->getRecipientName());
@@ -469,7 +469,7 @@ class UPNQRTest extends TestCase
 
         foreach ($correctCases as $case) {
             $this->QRR->setPaymentDate($case[0]);
-            $this->assertEquals($case[1], $this->QRR->formatDate($this->QRR->getPaymentDate()));
+            $this->assertEquals($case[1], $this->formatDateForTest($this->QRR, $this->QRR->getPaymentDate()));
         }
 
         $wrongCases = [
@@ -501,7 +501,7 @@ class UPNQRTest extends TestCase
 
         foreach ($correctCases as $case) {
             $this->QRR->setPaymentDueDate($case[0]);
-            $this->assertEquals($case[1], $this->QRR->formatDate($this->QRR->getPaymentDueDate()));
+            $this->assertEquals($case[1], $this->formatDateForTest($this->QRR, $this->QRR->getPaymentDueDate()));
         }
 
         $wrongCases = [
@@ -803,6 +803,10 @@ class UPNQRTest extends TestCase
 
     public function testGenerateQrCodeNonWritableDir(): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('Permission checks are skipped on Windows.');
+        }
+
         $dir = sys_get_temp_dir() . '/upnqr-nonwritable';
         $file = $dir . '/qr.svg';
 
@@ -828,6 +832,16 @@ class UPNQRTest extends TestCase
             }
             rmdir($dir);
         }
+    }
+
+    private function formatDateForTest(UPNQR $qr, ?string $date): string
+    {
+        $this->assertNotNull($date);
+
+        $reflection = new \ReflectionMethod(UPNQR::class, 'formatDate');
+        $reflection->setAccessible(true);
+
+        return $reflection->invoke($qr, $date);
     }
 
     public function testGenerationWrapsUnexpectedErrors(): void
