@@ -14,7 +14,7 @@ This library can output a PNG, SVG or EPS image to a local file.
 The code is fully tested, including OCRing of the generated QR code.
 
 ## Requirements
-- PHP >= 8.1 (see versions below)
+- PHP >= 8.3 (see versions below)
 - mbstring and iconv PHP extensions
 - imagick PHP extension — **optional**; required only for PNG (raster) output. SVG/EPS do not require imagick.
 
@@ -28,7 +28,7 @@ composer require datalinx/php-upn-qr-generator
 
 | Version | Dependencies                 | Development   |
 |---------|------------------------------|---------------|
-| 2.x     | PHP ^8.1<br/>Bacon QR ^3.0   | Active        |
+| 2.x     | PHP ^8.3<br/>Bacon QR ^3.0   | Active        |
 | 1.x     | PHP ^7.4<br/>Bacon QR ^2.0.7 | Bugfixes only |
 
 ## Usage
