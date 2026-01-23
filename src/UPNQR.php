@@ -185,6 +185,9 @@ class UPNQR
             ]) . $qrDelim;
 
         $encodedPayload = iconv('UTF-8', self::OUTPUT_ENCODING . '//IGNORE', $qrContentStr);
+        if ($encodedPayload === false) {
+            throw new InvalidArgumentException('Unable to encode QR payload to ' . self::OUTPUT_ENCODING . '.');
+        }
         $payloadLength = strlen($encodedPayload);
         if ($payloadLength > self::MAX_PAYLOAD_LENGTH) {
             throw new InvalidArgumentException(
@@ -286,7 +289,13 @@ class UPNQR
      */
     public function getPayload(): string
     {
-        return $this->serializeContents();
+        $payloadUtf8 = $this->serializeContents();
+        $payloadIso = iconv('UTF-8', self::OUTPUT_ENCODING, $payloadUtf8);
+        if ($payloadIso === false) {
+            throw new InvalidArgumentException('Unable to encode QR payload to ' . self::OUTPUT_ENCODING . '.');
+        }
+
+        return $payloadIso;
     }
 
     /**
