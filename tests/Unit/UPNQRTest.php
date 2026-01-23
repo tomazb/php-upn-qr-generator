@@ -129,6 +129,24 @@ class UPNQRTest extends TestCase
         $this->QRR->setRecipientCity("Ljubljana 🚀");
     }
 
+    public function testPayloadEncodingAndLengthSuffixConsistency(): void
+    {
+        $qr = UPNQR::create("SI56020360253863406", "Črnomelj");
+        $qr->setPurposeCode("COST");
+        $qr->setPaymentPurpose("Predračun 111");
+
+        $payload = $qr->getPayload();
+
+        $payloadLengthSuffix = (int) substr($payload, -3);
+        $payloadWithoutSuffix = substr($payload, 0, -3);
+
+        $this->assertSame(strlen($payloadWithoutSuffix), $payloadLengthSuffix);
+
+        $payloadUtf8 = iconv('ISO-8859-2', 'UTF-8', $payloadWithoutSuffix);
+        $this->assertNotFalse($payloadUtf8);
+        $this->assertStringContainsString('Črnomelj', $payloadUtf8);
+    }
+
     public function testPayloadLengthGuard(): void
     {
         $qr = UPNQR::create("SI56020360253863406", "Ljubljana");
