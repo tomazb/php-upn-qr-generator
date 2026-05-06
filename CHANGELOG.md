@@ -14,6 +14,7 @@
 ### Changed
 - Hardened validation (charset guard, strict dates, amount rounding/limits, payload length cap) with memoized serialization.
 - Exception clarity: user input errors remain `InvalidArgumentException`; unexpected writer/IO errors wrap into `QrGenerationException`.
+- Raised dependency floors to Bacon QR ^3.1.1, PHPUnit ^9.6.34, PHP CS Fixer ^3.95.1, and fixed Symfony Process releases.
 
 ## [2.0.0](https://github.com/DataLinx/php-upn-qr-generator/compare/v1.1.2...v2.0.0) (2025-06-16)
 
