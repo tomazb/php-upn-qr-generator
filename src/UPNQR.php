@@ -253,6 +253,7 @@ class UPNQR
                 // Bubble user/input errors unchanged
                 throw $exception;
             }
+
             throw new QrGenerationException("QR code generation failed: " . $exception->getMessage(), 0, $exception);
         }
     }
@@ -272,6 +273,7 @@ class UPNQR
             if ($exception instanceof InvalidArgumentException) {
                 throw $exception;
             }
+
             throw new QrGenerationException("QR code generation failed: " . $exception->getMessage(), 0, $exception);
         }
     }
@@ -951,6 +953,10 @@ class UPNQR
         $date = trim($date);
         if ($date === '') {
             return null;
+        }
+
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new InvalidArgumentException("$fieldName must be in YYYY-MM-DD format and be a valid date.");
         }
 
         $parsed = DateTimeImmutable::createFromFormat(self::DATE_INPUT_FORMAT, $date);

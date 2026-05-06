@@ -474,6 +474,9 @@ class UPNQRTest extends TestCase
 
         $wrongCases = [
             ["foo", "Payment date must be in YYYY-MM-DD format and be a valid date."],
+            ["202-05-06", "Payment date must be in YYYY-MM-DD format and be a valid date."],
+            ["2022-5-06", "Payment date must be in YYYY-MM-DD format and be a valid date."],
+            ["2022-05-6", "Payment date must be in YYYY-MM-DD format and be a valid date."],
             ["2022-02-31", "Payment date must be in YYYY-MM-DD format and be a valid date."],
         ];
 
@@ -506,6 +509,9 @@ class UPNQRTest extends TestCase
 
         $wrongCases = [
             ["foo", "Payment due date must be in YYYY-MM-DD format and be a valid date."],
+            ["202-05-06", "Payment due date must be in YYYY-MM-DD format and be a valid date."],
+            ["2022-5-06", "Payment due date must be in YYYY-MM-DD format and be a valid date."],
+            ["2022-05-6", "Payment due date must be in YYYY-MM-DD format and be a valid date."],
             ["2022-02-31", "Payment due date must be in YYYY-MM-DD format and be a valid date."],
         ];
 
