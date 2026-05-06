@@ -218,6 +218,10 @@ private function validateAndParseDate(?string $date, string $fieldName): ?string
         return null;
     }
 
+    if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        throw new InvalidArgumentException("$fieldName must be in YYYY-MM-DD format and be a valid date.");
+    }
+
     $parsed = DateTimeImmutable::createFromFormat('Y-m-d', $date);
     $errors = DateTimeImmutable::getLastErrors();
 
@@ -228,7 +232,7 @@ private function validateAndParseDate(?string $date, string $fieldName): ?string
     return $date;
 }
 
-public function formatDate(string $date): string
+private function formatDate(string $date): string
 {
     $parsed = DateTimeImmutable::createFromFormat('Y-m-d', $date);
     return $parsed->format('d.m.Y');
@@ -553,7 +557,7 @@ protected function tearDown(): void
 - `getPayload()` + `validate()` (API clarity)
 - Memoization (performance for repeated calls)
 
-### Consider for v3.0:
+### Consider for a future major:
 - Constructor with required fields (breaking)
 - Full builder pattern
 - Custom exception hierarchy

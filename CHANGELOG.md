@@ -1,6 +1,10 @@
 # Changelog
 
-## [2.1.0] - 2026-01-11
+## [3.0.0] - 2026-01-11
+### ⚠ BREAKING CHANGES
+- Dropped PHP 8.1 and 8.2 support; PHP ^8.3 is required.
+- `formatDate()` is now an internal helper and no longer part of the public API.
+
 ### Added
 - Validation helpers (`validate()`, `getPayload()`) and renderer reuse (`generateQrCodeWithRenderer()`).
 - Directory preflight checks and clearer PNG imagick requirement messaging.

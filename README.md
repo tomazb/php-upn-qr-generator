@@ -28,7 +28,8 @@ composer require datalinx/php-upn-qr-generator
 
 | Version | Dependencies                 | Development   |
 |---------|------------------------------|---------------|
-| 2.x     | PHP ^8.3<br/>Bacon QR ^3.0   | Active        |
+| 3.x     | PHP ^8.3<br/>Bacon QR ^3.0   | Active        |
+| 2.x     | PHP ^8.1<br/>Bacon QR ^3.0   | Bugfixes only |
 | 1.x     | PHP ^7.4<br/>Bacon QR ^2.0.7 | Bugfixes only |
 
 ## Usage

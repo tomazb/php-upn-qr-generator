@@ -1,11 +1,11 @@
-name: php-upn-qr-generator-php-8.2
+name: php-upn-qr-generator-php-8.3
 services:
   appserver:
     type: php:custom
     via: cli
     app_mount: delegated
     overrides:
-      image: slimdeluxe/php:8.2
+      image: slimdeluxe/php:8.3
       volumes:
         # Mount the project root directory to /app
         - "../..:/app"

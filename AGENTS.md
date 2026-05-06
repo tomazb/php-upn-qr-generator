@@ -6,7 +6,7 @@
 - PNG output requires `ext-imagick`; SVG/EPS do not.
 
 ## Setup
-1) Install PHP >= 8.1 with mbstring, iconv; optional imagick for PNG.
+1) Install PHP >= 8.3 with mbstring, iconv; optional imagick for PNG.
 2) Install deps: `composer install`.
 3) Branch in use: `smells-and-performance-improvements` (avoid switching unless requested).
 
