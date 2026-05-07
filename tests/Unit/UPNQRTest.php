@@ -5,6 +5,7 @@ namespace DataLinx\PhpUpnQrGenerator\Tests\Unit;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 use DataLinx\PhpUpnQrGenerator\Exception\QrGenerationException;
 use DataLinx\PhpUpnQrGenerator\UPNQR;
 use Exception;
@@ -820,16 +821,20 @@ class UPNQRTest extends TestCase
             mkdir($dir);
         }
 
-        chmod($dir, 0555);
-
-        $qr = new UPNQR();
-        $qr->setRecipientIban("SI56020360253863406");
-        $qr->setRecipientCity("Ljubljana");
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Directory is not writable: {$dir}");
-
         try {
+            chmod($dir, 0555);
+
+            if (is_writable($dir)) {
+                $this->markTestSkipped('Cannot make directory non-writable in this environment.');
+            }
+
+            $qr = new UPNQR();
+            $qr->setRecipientIban("SI56020360253863406");
+            $qr->setRecipientCity("Ljubljana");
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage("Directory is not writable: {$dir}");
+
             $qr->generateQrCode($file);
         } finally {
             chmod($dir, 0755);
@@ -853,26 +858,9 @@ class UPNQRTest extends TestCase
     public function testGenerationWrapsUnexpectedErrors(): void
     {
         $qr = new class () extends UPNQR {
-            public function generateQrCodeWithRenderer(\BaconQrCode\Renderer\ImageRenderer $renderer, string $filename): void
+            protected function createWriter(ImageRenderer $renderer): Writer
             {
-                $this->assertWritableDirectory($filename);
-
-                try {
-                    throw new Exception('boom');
-                } catch (Exception $exception) {
-                    throw new \DataLinx\PhpUpnQrGenerator\Exception\QrGenerationException(
-                        'QR code generation failed: ' . $exception->getMessage(),
-                        0,
-                        $exception
-                    );
-                }
-            }
-
-            protected function assertWritableDirectory(string $filename): void
-            {
-                $reflection = new \ReflectionMethod(UPNQR::class, 'assertWritableDirectory');
-                $reflection->setAccessible(true);
-                $reflection->invoke($this, $filename);
+                throw new Exception('boom');
             }
         };
 
@@ -901,9 +889,15 @@ class UPNQRTest extends TestCase
         $qr->setRecipientIban("SI56020360253863406");
         $qr->setRecipientCity("Ljubljana");
 
-        $qr->generateQrCodeWithRenderer($renderer, $svgFilename);
+        try {
+            $qr->generateQrCodeWithRenderer($renderer, $svgFilename);
 
-        $this->assertFileExists($svgFilename);
+            $this->assertFileExists($svgFilename);
+        } finally {
+            if (file_exists($svgFilename)) {
+                unlink($svgFilename);
+            }
+        }
     }
 
     public function testValidateAndGetPayload(): void

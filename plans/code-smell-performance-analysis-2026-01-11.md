@@ -24,7 +24,11 @@
 - **Phase 3 (Performance Optimizations)** — Completed
   - Added `generateQrCodeWithRenderer` to reuse pre-configured renderers/backends.
   - Extracted directory writability check to a helper for reuse.
-  - Added `validate()` and `getPayload()` helpers for DX; renderer-generation tests added; suite now `composer test` (30 tests, 164 assertions).
+
+- **Phase 4 (API Ergonomics & Developer Experience)** — Completed
+  - Added `validate()` and `getPayload()` helpers for explicit validation and payload inspection.
+  - Added renderer-generation coverage for `generateQrCodeWithRenderer()`.
+  - Suite now `composer test` (30 tests, 164 assertions).
 
 - **Phase 5 (Tests & Demo Application)** — Completed
   - Expanded tests: directory writability error path, renderer reuse, DX helpers.
@@ -400,6 +404,8 @@ public function getPayload(): string
 ---
 
 ## Phase 4: API Ergonomics & Developer Experience
+
+**Status:** Completed. Delivered `validate()` and `getPayload()` helpers; renderer reuse is covered under Phase 3.
 
 ### 4.1 Add Explicit `validate()` Method
 

@@ -244,9 +244,8 @@ class UPNQR
             $imageBackEnd
         );
 
-        $writer = $this->createWriter($renderer);
-
         try {
+            $writer = $this->createWriter($renderer);
             $writer->writeFile($this->serializeContents(), $filename, self::OUTPUT_ENCODING);
         } catch (Exception $exception) {
             if ($exception instanceof InvalidArgumentException) {
@@ -265,9 +264,8 @@ class UPNQR
     {
         $this->assertWritableDirectory($filename);
 
-        $writer = $this->createWriter($renderer);
-
         try {
+            $writer = $this->createWriter($renderer);
             $writer->writeFile($this->serializeContents(), $filename, self::OUTPUT_ENCODING);
         } catch (Exception $exception) {
             if ($exception instanceof InvalidArgumentException) {

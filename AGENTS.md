@@ -8,7 +8,7 @@
 ## Setup
 1) Install PHP >= 8.3 with mbstring, iconv; optional imagick for PNG.
 2) Install deps: `composer install`.
-3) Branch in use: `smells-and-performance-improvements` (avoid switching unless requested).
+3) Work on the current task branch; avoid switching branches unless requested.
 
 ## Commands
 - Run tests: `composer test`
@@ -30,8 +30,8 @@
 - README notes imagick as optional; keep dependency notes consistent.
 - Work in focused commits; do not bundle unrelated changes.
 
-## Demo (upcoming)
-- A demo app is requested; coordinate with existing requirements and use library via Composer autoload.
+## Demo
+- The demo app lives in `demo/`; keep it using the library through Composer autoload.
 
 ## Checklist before handoff
 - `composer test` green.

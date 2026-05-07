@@ -138,14 +138,14 @@ function embedSvg(?string $path): ?string
                 <input name="recipientCity" required value="<?= h($data['recipientCity']); ?>">
             </label>
             <label>Naziv prejemnika
-                <input name="recipientName" required value="<?= h($data['recipientName']); ?>">
+                <input name="recipientName" value="<?= h($data['recipientName']); ?>">
             </label>
             <label>Referenca prejemnika
                 <input name="recipientReference" value="<?= h($data['recipientReference']); ?>">
                 <span class="hint">Privzeto SI99 (sklic). Pustite prazno za privzeto.</span>
             </label>
             <label>Znesek (EUR)
-                <input name="amount" type="number" min="0" step="0.01" value="<?= h($data['amount']); ?>">
+                <input name="amount" type="number" min="0.01" step="0.01" value="<?= h($data['amount']); ?>">
                 <span class="hint">Pustite prazno, če znesek ni določen.</span>
             </label>
             <label>Opis namena
@@ -169,7 +169,7 @@ function embedSvg(?string $path): ?string
                 <input name="payerCity" value="<?= h($data['payerCity']); ?>">
             </label>
             <label>Šifra namena
-                <input name="purposeCode" maxlength="4" pattern="^[A-Za-z]{4}$" value="<?= h($data['purposeCode']); ?>">
+                <input name="purposeCode" maxlength="4" pattern="^[A-Z]{4}$" value="<?= h($data['purposeCode']); ?>">
                 <span class="hint">Štiri črke (npr. GDSV). Neobvezno.</span>
             </label>
         </fieldset>

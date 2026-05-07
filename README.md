@@ -111,7 +111,7 @@ $qr->generateQrCodeWithRenderer($renderer, './build/reused.svg');
 An interactive demo lives in `demo/`:
 1) `composer install`
 2) `php -S localhost:8000 -t demo`
-3) Open http://localhost:8000 — fill the form, preview SVG (and PNG when imagick is installed), and inspect payload.
+3) Open <http://localhost:8000> — fill the form, preview SVG (and PNG when imagick is installed), and inspect payload.
 Outputs are written to `demo/build/`.
 
 ### CI notes

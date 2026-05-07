@@ -32,6 +32,7 @@
     },
     "require": {
         "php": "^8.3",
+        "ext-iconv": "*",
         "ext-mbstring": "*",
         "bacon/bacon-qr-code": "^3.1.1"
     },
