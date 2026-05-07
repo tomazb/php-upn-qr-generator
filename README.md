@@ -14,9 +14,9 @@ This library can output a PNG, SVG or EPS image to a local file.
 The code is fully tested, including OCRing of the generated QR code.
 
 ## Requirements
-- PHP >= 7.4 (see versions below)
+- PHP >= 8.3 (see versions below)
 - mbstring and iconv PHP extensions
-- imagick PHP extension, but only if you want to generate PNG (raster) QR code images — not required for vector formats (SVG, EPS)
+- imagick PHP extension — **optional**; required only for PNG (raster) output. SVG/EPS do not require imagick.
 
 ## Installing
 Download it with composer:
@@ -28,7 +28,8 @@ composer require datalinx/php-upn-qr-generator
 
 | Version | Dependencies                 | Development   |
 |---------|------------------------------|---------------|
-| 2.x     | PHP ^8.1<br/>Bacon QR ^3.0   | Active        |
+| 3.x     | PHP ^8.3<br/>Bacon QR ^3.1.1 | Active        |
+| 2.x     | PHP ^8.1<br/>Bacon QR ^3.0   | Bugfixes only |
 | 1.x     | PHP ^7.4<br/>Bacon QR ^2.0.7 | Bugfixes only |
 
 ## Usage
@@ -74,6 +75,50 @@ try {
 The above code will generate this QR code:
 
 <img src="docs/example.svg" width="200px" alt="QR code example"/>
+
+### Validation and payload inspection
+You can validate inputs without writing a file and inspect the raw payload:
+```php
+$qr = new UPNQR();
+$qr->setRecipientIban("SI56020360253863406");
+$qr->setRecipientCity("Ljubljana");
+
+// Throws InvalidArgumentException on bad data
+$qr->validate();
+
+// Serialized payload (ISO-8859-2), suitable for logging or alternate QR renderers
+$payload = $qr->getPayload();
+```
+
+### Reusing a renderer (performance)
+If you need to reuse a preconfigured renderer (e.g., custom size or backend instance):
+```php
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use DataLinx\PhpUpnQrGenerator\UPNQR;
+
+$renderer = new ImageRenderer(new RendererStyle(200), new SvgImageBackEnd());
+
+$qr = new UPNQR();
+$qr->setRecipientIban("SI56020360253863406");
+$qr->setRecipientCity("Ljubljana");
+
+$qr->generateQrCodeWithRenderer($renderer, './build/reused.svg');
+```
+
+### Running the demo app
+An interactive demo lives in `demo/`:
+1) `composer install`
+2) `php -S localhost:8000 -t demo`
+3) Open <http://localhost:8000> — fill the form, preview SVG (and PNG when imagick is installed), and inspect payload.
+Outputs are written to `demo/build/`.
+
+### CI notes
+- PNG tests and demo PNG rendering require `ext-imagick`; ensure the CI image has `php-imagick` installed if you want PNG coverage. Otherwise PNG checks will be skipped.
+- SVG/EPS generation works without imagick.
+- Test suite: `composer test`
+- Lint/format: `composer format`
 
 ## Contributing
 If you have some suggestions how to make this package better, please open an issue or even better, submit a pull request.

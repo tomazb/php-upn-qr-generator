@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.0.0] - 2026-01-11
+### ⚠ BREAKING CHANGES
+- Dropped PHP 8.1 and 8.2 support; PHP ^8.3 is required.
+- `formatDate()` is now an internal helper and no longer part of the public API.
+
+### Added
+- Validation helpers (`validate()`, `getPayload()`) and renderer reuse (`generateQrCodeWithRenderer()`).
+- Directory preflight checks and clearer PNG imagick requirement messaging.
+- Interactive demo (`demo/index.php`) with form inputs, live SVG/PNG previews, payload display, and client-side validation hints.
+- Expanded tests: directory writability error path, renderer reuse, DX helpers, payload length/charset/amount/date validations, and error wrapping.
+
+### Changed
+- Hardened validation (charset guard, strict dates, amount rounding/limits, payload length cap) with memoized serialization.
+- Exception clarity: user input errors remain `InvalidArgumentException`; unexpected writer/IO errors wrap into `QrGenerationException`.
+- Raised dependency floors to Bacon QR ^3.1.1, PHPUnit ^9.6.34, PHP CS Fixer ^3.95.1, and fixed Symfony Process releases.
+
 ## [2.0.0](https://github.com/DataLinx/php-upn-qr-generator/compare/v1.1.2...v2.0.0) (2025-06-16)
 
 
