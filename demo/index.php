@@ -38,6 +38,17 @@ function h(?string $v): string
     return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8');
 }
 
+function payloadForDisplay(string $payload): string
+{
+    $converted = iconv('ISO-8859-2', 'UTF-8', $payload);
+
+    if ($converted === false) {
+        return '[Unable to convert payload from ISO-8859-2 to UTF-8]';
+    }
+
+    return $converted;
+}
+
 try {
     $qr = new UPNQR();
     $qr->setRecipientIban($data['recipientIban']);
@@ -200,7 +211,7 @@ function embedSvg(?string $path): ?string
 
     <?php if ($payload): ?>
         <h3>Payload (ISO-8859-2)</h3>
-        <div class="payload"><?= h($payload); ?></div>
+        <div class="payload"><?= h(payloadForDisplay($payload)); ?></div>
     <?php endif; ?>
 
     <h3>Uporaba</h3>
